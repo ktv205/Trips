@@ -1,0 +1,347 @@
+package com.nyu.cs9033.eta.controllers;
+import java.io.File;
+import java.sql.Timestamp;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import com.nyu.cs9033.eta.models.MyTripDataBaseHelper;
+import com.nyu.cs9033.eta.models.Person;
+import com.nyu.cs9033.eta.models.Trip;
+import com.nyu.cs9033.eta.models.TripContract;
+import com.nyu.cs9033.eta.R;
+
+import android.app.Activity;
+import android.content.ContentValues;
+import android.content.Intent;
+import android.database.Cursor;
+import android.database.sqlite.SQLiteDatabase;
+import android.net.Uri;
+import android.net.UrlQuerySanitizer.ValueSanitizer;
+import android.os.Bundle;
+import android.provider.ContactsContract;
+import android.text.Editable;
+import android.text.TextWatcher;
+import android.util.Log;
+import android.view.View;
+import android.view.View.OnClickListener;
+import android.view.View.OnFocusChangeListener;
+import android.widget.Button;
+import android.widget.DatePicker;
+import android.widget.EditText;
+import android.widget.TimePicker;
+import android.widget.Toast;
+
+public class CreateTripActivity extends Activity {
+	MyTripDataBaseHelper tripHelper;
+	SQLiteDatabase tripDatabase;
+	Button addFriends,createEvent;
+	EditText tripName,tripLocation,friendName,friendPhone,friendLocation;
+	DatePicker tripDate;
+	TimePicker tripTime;
+	Trip trip;
+	Person person;
+	String tripTitleText,tripLocationText,tripDataText,tripTimeText,
+	friendNameText,friendContactText,friendLocationText,tripLatitudeText,tripLongitudeText;	
+	int titleFlag=0,nameFlag=0,tripLocationFlag=0;
+	List<Long> personIds=new ArrayList<Long>();
+	long personId,tripId;
+	@Override
+	public void onCreate(Bundle savedInstanceState) {
+		super.onCreate(savedInstanceState);
+		super.setContentView(R.layout.create_trip_main);
+		setTitle("CreateTripWithFriends");
+		addFriends=(Button)findViewById(R.id.add_friends_button);
+		createEvent=(Button)findViewById(R.id.create_trip_button);
+		tripDate=(DatePicker)findViewById(R.id.date_trip_datepicker);
+		tripTime=(TimePicker)findViewById(R.id.time_trip_datepicker);
+		friendName=(EditText)findViewById(R.id.add_friends_name_edittext);
+		friendPhone=(EditText)findViewById(R.id.add_friends_phone_edittext);
+		friendLocation=(EditText)findViewById(R.id.add_friends_location_edittext);
+		tripName=(EditText)findViewById(R.id.name_trip_edittext);
+		tripLocation=(EditText)findViewById(R.id.location_trip_edittext);
+		File database=getApplicationContext().getDatabasePath("trip.db");
+		if(!database.exists()){		
+			//Toast.makeText(this,"first time creating a database", Toast.LENGTH_LONG).show();
+		}else{
+			//Toast.makeText(this,"database already created", Toast.LENGTH_LONG).show();
+		}
+	}
+
+	@Override
+	protected void onResume() {
+		super.onResume();
+		tripHelper=new MyTripDataBaseHelper(this);
+		tripDatabase=tripHelper.getWritableDatabase();
+		//isTableExists(tripDatabase);
+		tripLocation.setHint("eg:area,city::cuisine.");
+		TextWatcher text=new TextWatcher() {
+
+			@Override
+			public void onTextChanged(CharSequence s, int start, int before, int count) {
+				String value=s.toString();
+				if(checkString(value)){
+					value=value.substring(0, value.length()-1);
+					Intent intent=new Intent();
+					intent.setAction(Intent.ACTION_VIEW);
+					String uri="location://com.example.nyu.hw3api";
+					intent.putExtra("searchVal", value);
+					intent.setData(Uri.parse(uri));
+					startActivityForResult(intent, 1);
+				}
+			}
+
+			@Override
+			public void beforeTextChanged(CharSequence s, int start, int count,
+					int after) {
+				// TODO Auto-generated method stub
+			}
+
+			@Override
+			public void afterTextChanged(Editable s) {
+				// TODO Auto-generated method stub
+			}
+		};
+		tripLocation.addTextChangedListener(text);
+		friendName.setOnFocusChangeListener(new OnFocusChangeListener() {
+
+			@Override
+			public void onFocusChange(View v, boolean hasFocus) {
+				if(hasFocus==true &&friendName.getText().toString()!=""){
+					Intent pickContactIntent = new Intent( Intent.ACTION_PICK, ContactsContract.Contacts.CONTENT_URI );
+					startActivityForResult(pickContactIntent, 2);
+				}
+			}
+		});
+		createEvent.setOnClickListener(new OnClickListener() {
+			@Override
+			public void onClick(View v) {
+				if(tripName.getText().toString().equals("")){
+					titleFlag=0;
+				}else{
+					titleFlag=1;
+				}
+				if(tripLocation.getText().toString().equals("")){
+					tripLocationFlag=0;
+				}else{
+					tripLocationFlag=1;
+				}
+				if(titleFlag==0){
+					tripName.requestFocus();
+					//Toast.makeText(CreateTripActivity.this,"please enter the trip title", Toast.LENGTH_LONG).show();
+				}else if(tripLocationFlag==0){
+					tripLocation.requestFocus();
+					//Toast.makeText(CreateTripActivity.this,"please enter the trip location", Toast.LENGTH_LONG).show();
+				}else if(checkFriendField()==false){
+					friendFocusRequest();
+				}else{
+					tripTitleText=tripName.getText().toString();
+					tripDataText=tripDate.getMonth()+1+"/"+tripDate.getDayOfMonth()+"/"+tripDate.getYear();
+					tripTimeText=tripTime.getCurrentHour()+":"+tripTime.getCurrentMinute();
+					tripName.setText("");
+					tripLocation.setText("");
+					addTripToDataBase();
+				}
+			}
+		});
+		addFriends.setOnClickListener(new OnClickListener() {
+			@Override
+			public void onClick(View v) {
+				if(friendName.getText().toString().equals("")){
+					//Toast.makeText(CreateTripActivity.this, "add a friend", Toast.LENGTH_SHORT).show();
+					friendFocusRequest();
+				}else{
+					nameFlag=1;
+					friendName.setText("");
+					friendLocation.setText("");
+					friendPhone.setText("");
+					addFriendToDataBase();
+				}
+			}
+
+
+		});
+	}
+	private void friendFocusRequest() {
+		friendName.requestFocus();
+		//Toast.makeText(this, "please select a friend from address book",Toast.LENGTH_SHORT).show();
+
+	}
+	public boolean checkFriendField(){
+		if(friendName.getText().toString().equals("")){
+			if(nameFlag==0){
+				return false;
+			}else{
+				return true;
+			}
+		}else{
+			return true;
+		}
+
+
+	}
+	//	public int checkTripField(){
+	//		if(tripName.getText().toString().equals("")){
+	//			Toast.makeText(CreateTripActivity.this, "Please enter the trip name", Toast.LENGTH_SHORT).show();
+	//			tripName.requestFocus();
+	//			tripName.setHint("enter your trip name");
+	//			return 0;
+	//		}else if(tripLocation.getText().toString().equals("")){
+	//			Toast.makeText(CreateTripActivity.this, "Please enter the trip location", Toast.LENGTH_SHORT).show();
+	//			tripLocation.requestFocus();
+	//			tripLocation.setHint("enter your trip location");
+	//			return 1;
+	//		}else{
+	//			return 2;
+	//		}
+	//	}
+	public void sendTripToModel(int flag){
+	}
+	public boolean saveTrip(Trip trip) {
+		return false;
+	}
+	public void onBackPressed(){
+		finish();
+	}
+	public void cancelTrip() {
+		finish();
+	}
+	private void isTableExists(SQLiteDatabase tripDatabase2) {
+		if(tripDatabase2.isOpen()) {
+			//Toast.makeText(this,"data base is open", Toast.LENGTH_LONG).show();
+		}else{
+			//Toast.makeText(this,"data base is not open", Toast.LENGTH_LONG).show();
+			tripDatabase2=tripHelper.getReadableDatabase();
+		}
+		Cursor cursor=tripDatabase2.rawQuery("SELECT name FROM sqlite_master WHERE type =?", new String[]{"table"});
+		if(cursor.getCount()>0){
+			cursor.moveToFirst();
+			while(!cursor.isAfterLast()){
+				//Toast.makeText(this, cursor.getString(cursor.getColumnIndex("name")), Toast.LENGTH_LONG).show();
+				Cursor columnCursor=tripDatabase2.rawQuery("SELECT * FROM "+cursor.getString(cursor.getColumnIndex("name")), null);
+				String[] columnNames=columnCursor.getColumnNames();
+				for(String columnName:columnNames){
+					Cursor columnType=tripDatabase2.rawQuery("select typeof (" + columnName + ") from " + cursor.getString(cursor.getColumnIndex("name")), null);
+					if(columnType.getCount()>0){
+						columnType.moveToFirst();
+						//Toast.makeText(this, columnType.getString(0),Toast.LENGTH_SHORT).show();
+					}
+				}
+				cursor.moveToNext();
+			}
+			//Toast.makeText(this,cursor.getCount()+"",Toast.LENGTH_LONG).show();
+		}else{
+			//Toast.makeText(this,"tables does not exist",Toast.LENGTH_LONG).show();
+		}
+	}
+	public void addFriendToDataBase(){
+		Cursor friendExists=tripDatabase.rawQuery("SELECT * FROM "+TripContract.PersonEntry.TABLE_NAME+" WHERE "+TripContract.PersonEntry.COLUMN_NAME_PERSON_NAME+"=?", new String[]{friendNameText});
+		if(friendExists.getCount()==0){
+			ContentValues values = new ContentValues();
+			java.util.Date date= new java.util.Date();
+			Timestamp myTimeStamp=new Timestamp(date.getTime());
+			String timeStamp = new SimpleDateFormat("MM/dd/yyyy HH:mm:ss",Locale.US).format(myTimeStamp);
+			values.put(TripContract.PersonEntry.COLUMN_NAME_PERSON_NAME, friendNameText);
+			values.put(TripContract.PersonEntry.COLUMN_NAME_PHONE, friendContactText);
+			values.put(TripContract.PersonEntry.COLUMN_NAME_LOCATION, friendLocationText);
+			values.put(TripContract.PersonEntry.COLUMN_NAME_TIMESTAMP, timeStamp);
+			personId=tripDatabase.insert(TripContract.PersonEntry.TABLE_NAME, null, values);
+			//Toast.makeText(this, "first time entry",Toast.LENGTH_LONG).show();
+			personIds.add(personId);
+			//Toast.makeText(this, "first time entry",Toast.LENGTH_LONG).show();
+			//String sql="INSERT INTO sms VALUES (null,?,?,?,datetime('NOW'))";
+			//			tripDatabase.execSQL("INSERT INTO "+TripContract.PersonEntry.TABLE_NAME+"("
+			//					+TripContract.PersonEntry.COLUMN_NAME_PERSON_NAME+","
+			//					+TripContract.PersonEntry.COLUMN_NAME_PHONE+","
+			//					+TripContract.PersonEntry.COLUMN_NAME_LOCATION+","
+			//					+TripContract.PersonEntry.COLUMN_NAME_TIMESTAMP+")"
+			//					+" values(?,?,?,'datetime()')"
+			//					,new String[]{friendNameText,friendContactText,friendLocationText});
+		}else{
+			friendExists.moveToFirst();
+			personId=friendExists.getInt(friendExists.getColumnIndex(TripContract.PersonEntry._ID));
+			personIds.add(personId);
+			//Toast.makeText(this,friendExists.getInt(friendExists.getColumnIndex(TripContract.PersonEntry._ID))+"", Toast.LENGTH_LONG).show();
+		}
+
+	}
+	public void addTripToDataBase(){
+		Cursor tripExists=tripDatabase.rawQuery("SELECT * FROM "+TripContract.TripEntry.TABLE_NAME+" WHERE "+
+				TripContract.TripEntry.COLUMN_NAME_TRIP_NAME+"=?", new String[]{tripTitleText});
+		if(tripExists.getCount()==0){
+			ContentValues values = new ContentValues();
+			java.util.Date date= new java.util.Date();
+			Timestamp myTimeStamp=new Timestamp(date.getTime());
+			String timeStamp = new SimpleDateFormat("MM/dd/yyyy HH:mm:ss",Locale.US).format(myTimeStamp);
+			values.put(TripContract.TripEntry.COLUMN_NAME_TRIP_NAME,tripTitleText);
+			values.put(TripContract.TripEntry.COLUMN_NAME_LOCATION, tripLocationText);
+			values.put(TripContract.TripEntry.COLUMN_NAME_DATE, tripDataText);
+			values.put(TripContract.TripEntry.COLUMN_NAME_TIME, tripTimeText);
+			values.put(TripContract.TripEntry.COLUMN_NAME_LONGITUDE, tripLongitudeText);
+			values.put(TripContract.TripEntry.COLUMN_NAME_LATITUDE,tripLatitudeText);
+			values.put(TripContract.TripEntry.COLUMN_NAME_TIMESTAMP,timeStamp);
+			tripId=tripDatabase.insert(TripContract.TripEntry.TABLE_NAME, null, values);
+			//Toast.makeText(this, tripId+"->>", Toast.LENGTH_SHORT).show();
+		}else{
+			tripExists.moveToFirst();
+			tripId=tripExists.getInt(tripExists.getColumnIndex(TripContract.TripEntry._ID));
+			//Toast.makeText(this, "already in db"+tripId+"<->"+tripExists.getString(tripExists.getColumnIndex(TripContract.TripEntry.COLUMN_NAME_TRIP_NAME)), Toast.LENGTH_SHORT).show();
+		}
+		for(int i=0;i<personIds.size();i++){
+			tripDatabase.execSQL("INSERT INTO "+TripContract.PersonTripEntry.TABLE_NAME+"("+TripContract.PersonTripEntry.COLUMN_NAME_PERSON_ID
+					+","+TripContract.PersonTripEntry.COLUMN_NAME_TRIP_ID+ ")VALUES("+personIds.get(i)+","+tripId+")");
+		}
+		Cursor tripPerson=tripDatabase.rawQuery("SELECT * FROM "+TripContract.PersonTripEntry.TABLE_NAME, null);
+		//Toast.makeText(this, "trippeaolpshit"+tripPerson.getCount(), Toast.LENGTH_LONG).show();
+		onBackPressed();
+
+	}
+	private boolean checkString(String value) {
+		String line =value;
+		String pattern = "[0-9\\sa-z&nbsp;A-z][0-9\\sa-z&nbsp;A-Z]+"
+				+ ",[0-9\\sa-z&nbsp;A-z][0-9\\sa-z&nbsp;A-Z]+::"
+				+ "[0-9\\sa-z&nbsp;A-Z][0-9\\sa-z&nbsp;A-Z]+\\.";
+		Pattern r = Pattern.compile(pattern);
+		Matcher m = r.matcher(line);
+		if (m.find()){
+			return true;
+		}else{
+			return false;
+		}
+	}
+	@Override
+	public void onActivityResult(int requestCode, int resultCode, Intent data) {
+		super.onActivityResult(requestCode, resultCode, data);
+		Log.i("hello", "in onstatacrtiveyresult");
+		if(data!=null){
+			if (requestCode == 1) {
+				Log.i("hello", "in onstatacrtiveyresult");
+				//Toast.makeText(this, data.getStringArrayListExtra("retVal").get(0),Toast.LENGTH_SHORT).show();
+				tripLocationText=data.getStringArrayListExtra("retVal").get(0)+","+data.getStringArrayListExtra("retVal").get(1);
+				tripLatitudeText=data.getStringArrayListExtra("retVal").get(2);
+				tripLongitudeText=data.getStringArrayListExtra("retVal").get(3);
+				tripLocation.setText(tripLocationText);
+				if (resultCode == RESULT_OK) {
+				}
+			}
+			if(requestCode==2){
+				Uri uri=data.getData();
+				Cursor cursor=getContentResolver().query(uri, null, null, null, null);
+				cursor.moveToFirst();
+				friendNameText=cursor.getString(cursor.getColumnIndex(ContactsContract.Contacts.DISPLAY_NAME));
+				friendName.setText(friendNameText);
+				int id=cursor.getInt(cursor.getColumnIndex(ContactsContract.Contacts._ID));
+				Cursor phoneCursor=getContentResolver().query(ContactsContract.CommonDataKinds.Phone.CONTENT_URI, null,ContactsContract.CommonDataKinds.Phone.CONTACT_ID + " = ?", new String[] { String.valueOf(id) }, null);
+				phoneCursor.moveToFirst();
+				friendContactText=phoneCursor.getString(phoneCursor.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER));
+				friendPhone.setText(friendContactText);
+			}
+		}
+	}
+
+
+
+}

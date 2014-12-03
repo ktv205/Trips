@@ -1,0 +1,135 @@
+public class CreateTripActivity extends Activity {
+	int flag;
+	private static final String TAG = "CreateTripActivity";
+	Button addFriends,createEvent;
+	EditText tripName,tripLocation,friendName,friendPhone,friendLocation;
+	DatePicker tripDate;
+	TimePicker tripTime;
+	Trip trip;
+	ArrayList<Person> friends;
+	Person person;
+	@Override
+	public void onCreate(Bundle savedInstanceState) {
+		super.onCreate(savedInstanceState);
+		super.setContentView(R.layout.create_trip_main);
+		setTitle("CreateTripWithFriends");
+		addFriends=(Button)findViewById(R.id.add_friends_button);
+		createEvent=(Button)findViewById(R.id.create_trip_button);
+		tripDate=(DatePicker)findViewById(R.id.date_trip_datepicker);
+		tripTime=(TimePicker)findViewById(R.id.time_trip_datepicker);
+		friendName=(EditText)findViewById(R.id.add_friends_name_edittext);
+		friendPhone=(EditText)findViewById(R.id.add_friends_phone_edittext);
+		friendLocation=(EditText)findViewById(R.id.add_friends_location_edittext);
+		tripName=(EditText)findViewById(R.id.name_trip_edittext);
+		tripLocation=(EditText)findViewById(R.id.location_trip_edittext);
+		friends=new ArrayList<Person>();
+		createEvent.setOnClickListener(new OnClickListener() {
+			@Override
+			public void onClick(View v) {
+				flag=0;
+				flag=checkFriendField(flag);
+				if(flag==0){
+
+				}else{
+					sendTripToModel(flag);
+				}
+				flag=checkTripField();
+				if(checkTripField()==2){
+					sendTripToModel(flag);
+				}
+
+			}
+		});
+		addFriends.setOnClickListener(new OnClickListener() {
+			@Override
+			public void onClick(View v) {
+				flag=1;
+				flag=checkFriendField(flag);
+				if(flag==0){
+					Toast.makeText(CreateTripActivity.this, "Please enter the name", Toast.LENGTH_SHORT).show();
+					friendName.requestFocus();
+					friendName.setHint("enter your friends name");
+				}else{
+					sendTripToModel(flag);
+				}
+
+			}
+		});
+	}
+	public ArrayList<Person> addFriend(String name,String phone,String location,Person person,ArrayList<Person> friends){
+		person=new Person(name,phone,location);
+		friends.add(person);
+		return friends;
+
+	}	
+	public Trip createTrip(String name, String location, String date, String time, ArrayList<Person> friends2) {
+		trip=new Trip(name,location,date,time,friends2);
+		return trip;
+		
+	}
+	public int checkFriendField(int flag){
+		if(flag==0){
+			if(!tripName.getText().toString().equals("")){
+				flag=1;
+				return flag;
+			}else{
+				flag=0;
+				return flag;
+			}
+		}else{
+			if(tripName.getText().toString().equals("")){
+				flag=0;
+				return flag;
+			}else{
+				flag=1;
+				return flag;
+			}
+		}
+
+	}
+	public int checkTripField(){
+		if(tripName.getText().toString().equals("")){
+			Toast.makeText(CreateTripActivity.this, "Please enter the trip name", Toast.LENGTH_SHORT).show();
+			tripName.requestFocus();
+			tripName.setHint("enter your trip name");
+			return 0;
+		}else if(tripLocation.getText().toString().equals("")){
+			Toast.makeText(CreateTripActivity.this, "Please enter the trip location", Toast.LENGTH_SHORT).show();
+			tripLocation.requestFocus();
+			tripLocation.setHint("enter your trip location");
+			return 1;
+		}else{
+			return 2;
+		}
+	}
+	public void sendTripToModel(int flag){
+		if(flag==1){
+			friends=addFriend(friendName.getText().toString(),friendPhone.getText().toString(),
+					friendLocation.getText().toString(),person,friends);
+			Toast.makeText(this,"friend added", Toast.LENGTH_SHORT).show();
+			friendName.setText("");
+			friendPhone.setText("");
+			friendLocation.setText("");
+			friendName.requestFocus();
+		}else if(flag==2){
+			String date=tripDate.getMonth()+1+"/"+tripDate.getDayOfMonth()+"/"+tripDate.getYear();
+			String time=tripTime.getCurrentHour()+":"+tripTime.getCurrentMinute();
+			trip=createTrip(tripName.getText().toString(),tripLocation.getText().toString(),date,time,friends);
+			saveTrip(trip);
+		}
+	}
+	public boolean saveTrip(Trip trip) {
+		getIntent().putExtra("key1",trip);
+		setResult(RESULT_OK, getIntent());
+		finish();
+		return false;
+	}
+    public void onBackPressed(){
+    	cancelTrip();
+    }
+	public void cancelTrip() {
+	    trip=null;
+	    friends=null;
+	    finish();
+	}
+}

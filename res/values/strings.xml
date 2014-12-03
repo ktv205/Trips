@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <string name="app_name">ETA</string>
+    <string name="action_settings">Settings</string>
+    <string name="hello_world">Hello world!</string>
+    <string name="create_trip_button_text">click here to create a trip</string>
+    <string name="view_trip_button_text">click here to view your trips</string>
+    <string name="title_activity_trips_list">TripsList</string>
+
+</resources>
